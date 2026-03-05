@@ -5,17 +5,18 @@ from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+from src.routes.v1.authors.schema import AuthorCreateInput
 from src.routes.v1.authors.service import AuthorService
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_author_success(authenticated_client: AsyncClient, author_service: AuthorService):
+async def test_create_author_success(admin_client: AsyncClient, author_service: AuthorService):
     author_data = {
         "name": "Jane Doe",
         "bio": "A talented writer",
     }
 
-    response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    response = await admin_client.post("/api/v1/authors", json=author_data)
 
     assert response.status_code == 201
     data = response.json()
@@ -30,12 +31,12 @@ async def test_create_author_success(authenticated_client: AsyncClient, author_s
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_author_without_bio(authenticated_client: AsyncClient, author_service: AuthorService):
+async def test_create_author_without_bio(admin_client: AsyncClient, author_service: AuthorService):
     author_data = {
         "name": "John Smith",
     }
 
-    response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    response = await admin_client.post("/api/v1/authors", json=author_data)
 
     assert response.status_code == 201
     data = response.json()
@@ -44,20 +45,20 @@ async def test_create_author_without_bio(authenticated_client: AsyncClient, auth
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_author_invalid_name(authenticated_client: AsyncClient):
+async def test_create_author_invalid_name(admin_client: AsyncClient):
     author_data = {
         "name": "",
         "bio": "Some bio",
     }
 
-    response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    response = await admin_client.post("/api/v1/authors", json=author_data)
 
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_list_authors_empty(authenticated_client: AsyncClient):
-    response = await authenticated_client.get("/api/v1/authors")
+async def test_list_authors_empty(admin_client: AsyncClient):
+    response = await admin_client.get("/api/v1/authors")
 
     assert response.status_code == 200
     data = response.json()
@@ -66,20 +67,20 @@ async def test_list_authors_empty(authenticated_client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_list_authors_with_data(authenticated_client: AsyncClient):
+async def test_list_authors_with_data(admin_client: AsyncClient):
     # Create test authors via API
     author1_data = {"name": "Author One", "bio": "Bio one"}
     author2_data = {"name": "Author Two"}
 
-    response1 = await authenticated_client.post("/api/v1/authors", json=author1_data)
+    response1 = await admin_client.post("/api/v1/authors", json=author1_data)
     assert response1.status_code == 201
     author1 = response1.json()
 
-    response2 = await authenticated_client.post("/api/v1/authors", json=author2_data)
+    response2 = await admin_client.post("/api/v1/authors", json=author2_data)
     assert response2.status_code == 201
     author2 = response2.json()
 
-    response = await authenticated_client.get("/api/v1/authors")
+    response = await admin_client.get("/api/v1/authors")
 
     assert response.status_code == 200
     data = response.json()
@@ -89,14 +90,14 @@ async def test_list_authors_with_data(authenticated_client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_get_author_success(authenticated_client: AsyncClient):
+async def test_get_author_success(admin_client: AsyncClient):
     # Create test author via API
     author_data = {"name": "Test Author", "bio": "Test bio"}
-    create_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    create_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert create_response.status_code == 201
     created_author = create_response.json()
 
-    response = await authenticated_client.get(f"/api/v1/authors/{created_author['id']}")
+    response = await admin_client.get(f"/api/v1/authors/{created_author['id']}")
 
     assert response.status_code == 200
     data = response.json()
@@ -106,19 +107,19 @@ async def test_get_author_success(authenticated_client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_get_author_not_found(authenticated_client: AsyncClient):
+async def test_get_author_not_found(admin_client: AsyncClient):
     random_id = uuid.uuid4()
-    response = await authenticated_client.get(f"/api/v1/authors/{random_id}")
+    response = await admin_client.get(f"/api/v1/authors/{random_id}")
 
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_author_name(authenticated_client: AsyncClient, author_service: AuthorService):
+async def test_update_author_name(admin_client: AsyncClient, author_service: AuthorService):
     # Create test author via API
     author_data = {"name": "Original Name", "bio": "Original bio"}
-    create_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    create_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert create_response.status_code == 201
     created_author = create_response.json()
 
@@ -126,7 +127,7 @@ async def test_update_author_name(authenticated_client: AsyncClient, author_serv
         "name": "Updated Name",
     }
 
-    response = await authenticated_client.patch(f"/api/v1/authors/{created_author['id']}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/authors/{created_author['id']}", json=update_data)
 
     assert response.status_code == 200
     data = response.json()
@@ -139,10 +140,10 @@ async def test_update_author_name(authenticated_client: AsyncClient, author_serv
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_author_bio(authenticated_client: AsyncClient, author_service: AuthorService):
+async def test_update_author_bio(admin_client: AsyncClient, author_service: AuthorService):
     # Create test author via API
     author_data = {"name": "Author Name", "bio": "Old bio"}
-    create_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    create_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert create_response.status_code == 201
     created_author = create_response.json()
 
@@ -150,7 +151,7 @@ async def test_update_author_bio(authenticated_client: AsyncClient, author_servi
         "bio": "New bio",
     }
 
-    response = await authenticated_client.patch(f"/api/v1/authors/{created_author['id']}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/authors/{created_author['id']}", json=update_data)
 
     assert response.status_code == 200
     data = response.json()
@@ -163,26 +164,26 @@ async def test_update_author_bio(authenticated_client: AsyncClient, author_servi
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_author_not_found(authenticated_client: AsyncClient):
+async def test_update_author_not_found(admin_client: AsyncClient):
     random_id = uuid.uuid4()
     update_data = {
         "name": "New Name",
     }
 
-    response = await authenticated_client.patch(f"/api/v1/authors/{random_id}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/authors/{random_id}", json=update_data)
 
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_delete_author_success(authenticated_client: AsyncClient, author_service: AuthorService):
+async def test_delete_author_success(admin_client: AsyncClient, author_service: AuthorService):
     # Create test author via API
     author_data = {"name": "To Delete", "bio": "Will be deleted"}
-    create_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    create_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert create_response.status_code == 201
     created_author = create_response.json()
 
-    response = await authenticated_client.delete(f"/api/v1/authors/{created_author['id']}")
+    response = await admin_client.delete(f"/api/v1/authors/{created_author['id']}")
 
     assert response.status_code == 204
 
@@ -192,8 +193,33 @@ async def test_delete_author_success(authenticated_client: AsyncClient, author_s
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_delete_author_not_found(authenticated_client: AsyncClient):
+async def test_delete_author_not_found(admin_client: AsyncClient):
     random_id = uuid.uuid4()
-    response = await authenticated_client.delete(f"/api/v1/authors/{random_id}")
+    response = await admin_client.delete(f"/api/v1/authors/{random_id}")
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_create_author_forbidden_for_regular_user(authenticated_client: AsyncClient):
+    response = await authenticated_client.post("/api/v1/authors", json={"name": "Forbidden Author"})
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_update_author_forbidden_for_regular_user(authenticated_client: AsyncClient, author_service: AuthorService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+
+    response = await authenticated_client.patch(f"/api/v1/authors/{author.id}", json={"name": "Hacked Name"})
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_delete_author_forbidden_for_regular_user(authenticated_client: AsyncClient, author_service: AuthorService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+
+    response = await authenticated_client.delete(f"/api/v1/authors/{author.id}")
+
+    assert response.status_code == 403

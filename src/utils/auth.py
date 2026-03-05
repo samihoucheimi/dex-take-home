@@ -5,6 +5,7 @@ import bcrypt
 from fastapi import Depends, HTTPException
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlmodel.ext.asyncio.session import AsyncSession
+from src.db.models import DBUser
 from src.db.operations import get_db_session
 from src.routes.v1.users.schema import UserLoginInput
 from src.routes.v1.users.service import UserService
@@ -42,6 +43,12 @@ async def authenticate_user(
     if not user.is_active:
         raise HTTPException(status_code=401, detail="Invalid or expired session")
 
+    return user
+
+
+async def require_admin(user: DBUser = Depends(authenticate_user)) -> DBUser:
+    if not user.is_admin:
+        raise HTTPException(status_code=403, detail="Admin access required")
     return user
 
 

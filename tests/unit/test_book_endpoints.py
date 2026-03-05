@@ -5,14 +5,17 @@ from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+from src.routes.v1.authors.schema import AuthorCreateInput
+from src.routes.v1.authors.service import AuthorService
+from src.routes.v1.books.schema import BookCreateInput
 from src.routes.v1.books.service import BookService
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_book_success(authenticated_client: AsyncClient, book_service: BookService):
+async def test_create_book_success(admin_client: AsyncClient, book_service: BookService):
     # Create test author via API first
     author_data = {"name": "Test Author", "bio": "Test bio"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
@@ -24,7 +27,7 @@ async def test_create_book_success(authenticated_client: AsyncClient, book_servi
         "published_date": "2024-01-15T10:00:00",
     }
 
-    response = await authenticated_client.post("/api/v1/books", json=book_data)
+    response = await admin_client.post("/api/v1/books", json=book_data)
 
     assert response.status_code == 201
     data = response.json()
@@ -41,10 +44,10 @@ async def test_create_book_success(authenticated_client: AsyncClient, book_servi
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_book_without_optional_fields(authenticated_client: AsyncClient):
+async def test_create_book_without_optional_fields(admin_client: AsyncClient):
     # Create test author via API first
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
@@ -54,7 +57,7 @@ async def test_create_book_without_optional_fields(authenticated_client: AsyncCl
         "price": 19.99,
     }
 
-    response = await authenticated_client.post("/api/v1/books", json=book_data)
+    response = await admin_client.post("/api/v1/books", json=book_data)
 
     assert response.status_code == 201
     data = response.json()
@@ -64,10 +67,10 @@ async def test_create_book_without_optional_fields(authenticated_client: AsyncCl
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_book_invalid_price(authenticated_client: AsyncClient):
+async def test_create_book_invalid_price(admin_client: AsyncClient):
     # Create test author via API first
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
@@ -77,16 +80,16 @@ async def test_create_book_invalid_price(authenticated_client: AsyncClient):
         "price": -10.00,
     }
 
-    response = await authenticated_client.post("/api/v1/books", json=book_data)
+    response = await admin_client.post("/api/v1/books", json=book_data)
 
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_book_zero_price(authenticated_client: AsyncClient):
+async def test_create_book_zero_price(admin_client: AsyncClient):
     # Create test author via API first
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
@@ -96,16 +99,16 @@ async def test_create_book_zero_price(authenticated_client: AsyncClient):
         "price": 0,
     }
 
-    response = await authenticated_client.post("/api/v1/books", json=book_data)
+    response = await admin_client.post("/api/v1/books", json=book_data)
 
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_create_book_empty_title(authenticated_client: AsyncClient):
+async def test_create_book_empty_title(admin_client: AsyncClient):
     # Create test author via API first
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
@@ -115,14 +118,14 @@ async def test_create_book_empty_title(authenticated_client: AsyncClient):
         "price": 15.99,
     }
 
-    response = await authenticated_client.post("/api/v1/books", json=book_data)
+    response = await admin_client.post("/api/v1/books", json=book_data)
 
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_list_books_empty(authenticated_client: AsyncClient):
-    response = await authenticated_client.get("/api/v1/books")
+async def test_list_books_empty(admin_client: AsyncClient):
+    response = await admin_client.get("/api/v1/books")
 
     assert response.status_code == 200
     data = response.json()
@@ -131,25 +134,25 @@ async def test_list_books_empty(authenticated_client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_list_books_with_data(authenticated_client: AsyncClient):
+async def test_list_books_with_data(admin_client: AsyncClient):
     # Create test author via API
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
     # Create test books via API
     book1_data = {"title": "Book One", "author_id": author["id"], "price": 19.99, "description": "First book"}
-    book1_response = await authenticated_client.post("/api/v1/books", json=book1_data)
+    book1_response = await admin_client.post("/api/v1/books", json=book1_data)
     assert book1_response.status_code == 201
     book1 = book1_response.json()
 
     book2_data = {"title": "Book Two", "author_id": author["id"], "price": 29.99}
-    book2_response = await authenticated_client.post("/api/v1/books", json=book2_data)
+    book2_response = await admin_client.post("/api/v1/books", json=book2_data)
     assert book2_response.status_code == 201
     book2 = book2_response.json()
 
-    response = await authenticated_client.get("/api/v1/books")
+    response = await admin_client.get("/api/v1/books")
 
     assert response.status_code == 200
     data = response.json()
@@ -159,19 +162,19 @@ async def test_list_books_with_data(authenticated_client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_get_book_success(authenticated_client: AsyncClient):
+async def test_get_book_success(admin_client: AsyncClient):
     # Create test author and book via API
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
     book_data = {"title": "Test Book", "author_id": author["id"], "description": "Test description", "price": 24.99}
-    create_response = await authenticated_client.post("/api/v1/books", json=book_data)
+    create_response = await admin_client.post("/api/v1/books", json=book_data)
     assert create_response.status_code == 201
     created_book = create_response.json()
 
-    response = await authenticated_client.get(f"/api/v1/books/{created_book['id']}")
+    response = await admin_client.get(f"/api/v1/books/{created_book['id']}")
 
     assert response.status_code == 200
     data = response.json()
@@ -182,24 +185,24 @@ async def test_get_book_success(authenticated_client: AsyncClient):
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_get_book_not_found(authenticated_client: AsyncClient):
+async def test_get_book_not_found(admin_client: AsyncClient):
     random_id = uuid.uuid4()
-    response = await authenticated_client.get(f"/api/v1/books/{random_id}")
+    response = await admin_client.get(f"/api/v1/books/{random_id}")
 
     assert response.status_code == 404
     assert "not found" in response.json()["detail"].lower()
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_book_title(authenticated_client: AsyncClient, book_service: BookService):
+async def test_update_book_title(admin_client: AsyncClient, book_service: BookService):
     # Create test author and book via API
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
     book_data = {"title": "Original Title", "author_id": author["id"], "price": 19.99}
-    create_response = await authenticated_client.post("/api/v1/books", json=book_data)
+    create_response = await admin_client.post("/api/v1/books", json=book_data)
     assert create_response.status_code == 201
     created_book = create_response.json()
 
@@ -207,7 +210,7 @@ async def test_update_book_title(authenticated_client: AsyncClient, book_service
         "title": "Updated Title",
     }
 
-    response = await authenticated_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
 
     assert response.status_code == 200
     data = response.json()
@@ -220,15 +223,15 @@ async def test_update_book_title(authenticated_client: AsyncClient, book_service
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_book_price(authenticated_client: AsyncClient, book_service: BookService):
+async def test_update_book_price(admin_client: AsyncClient, book_service: BookService):
     # Create test author and book via API
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
     book_data = {"title": "Test Book", "author_id": author["id"], "price": 19.99}
-    create_response = await authenticated_client.post("/api/v1/books", json=book_data)
+    create_response = await admin_client.post("/api/v1/books", json=book_data)
     assert create_response.status_code == 201
     created_book = create_response.json()
 
@@ -236,7 +239,7 @@ async def test_update_book_price(authenticated_client: AsyncClient, book_service
         "price": 29.99,
     }
 
-    response = await authenticated_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
 
     assert response.status_code == 200
     data = response.json()
@@ -248,15 +251,15 @@ async def test_update_book_price(authenticated_client: AsyncClient, book_service
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_book_description(authenticated_client: AsyncClient, book_service: BookService):
+async def test_update_book_description(admin_client: AsyncClient, book_service: BookService):
     # Create test author and book via API
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
     book_data = {"title": "Test Book", "author_id": author["id"], "price": 19.99}
-    create_response = await authenticated_client.post("/api/v1/books", json=book_data)
+    create_response = await admin_client.post("/api/v1/books", json=book_data)
     assert create_response.status_code == 201
     created_book = create_response.json()
 
@@ -264,7 +267,7 @@ async def test_update_book_description(authenticated_client: AsyncClient, book_s
         "description": "New description",
     }
 
-    response = await authenticated_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
 
     assert response.status_code == 200
     data = response.json()
@@ -272,15 +275,15 @@ async def test_update_book_description(authenticated_client: AsyncClient, book_s
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_book_invalid_price(authenticated_client: AsyncClient):
+async def test_update_book_invalid_price(admin_client: AsyncClient):
     # Create test author and book via API
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
     book_data = {"title": "Test Book", "author_id": author["id"], "price": 19.99}
-    create_response = await authenticated_client.post("/api/v1/books", json=book_data)
+    create_response = await admin_client.post("/api/v1/books", json=book_data)
     assert create_response.status_code == 201
     created_book = create_response.json()
 
@@ -288,37 +291,37 @@ async def test_update_book_invalid_price(authenticated_client: AsyncClient):
         "price": -5.00,
     }
 
-    response = await authenticated_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/books/{created_book['id']}", json=update_data)
 
     assert response.status_code == 422
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_update_book_not_found(authenticated_client: AsyncClient):
+async def test_update_book_not_found(admin_client: AsyncClient):
     random_id = uuid.uuid4()
     update_data = {
         "title": "New Title",
     }
 
-    response = await authenticated_client.patch(f"/api/v1/books/{random_id}", json=update_data)
+    response = await admin_client.patch(f"/api/v1/books/{random_id}", json=update_data)
 
     assert response.status_code == 404
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_delete_book_success(authenticated_client: AsyncClient, book_service: BookService):
+async def test_delete_book_success(admin_client: AsyncClient, book_service: BookService):
     # Create test author and book via API
     author_data = {"name": "Test Author"}
-    author_response = await authenticated_client.post("/api/v1/authors", json=author_data)
+    author_response = await admin_client.post("/api/v1/authors", json=author_data)
     assert author_response.status_code == 201
     author = author_response.json()
 
     book_data = {"title": "To Delete", "author_id": author["id"], "price": 19.99}
-    create_response = await authenticated_client.post("/api/v1/books", json=book_data)
+    create_response = await admin_client.post("/api/v1/books", json=book_data)
     assert create_response.status_code == 201
     created_book = create_response.json()
 
-    response = await authenticated_client.delete(f"/api/v1/books/{created_book['id']}")
+    response = await admin_client.delete(f"/api/v1/books/{created_book['id']}")
 
     assert response.status_code == 204
 
@@ -328,8 +331,38 @@ async def test_delete_book_success(authenticated_client: AsyncClient, book_servi
 
 
 @pytest.mark.asyncio(loop_scope="function")
-async def test_delete_book_not_found(authenticated_client: AsyncClient):
+async def test_delete_book_not_found(admin_client: AsyncClient):
     random_id = uuid.uuid4()
-    response = await authenticated_client.delete(f"/api/v1/books/{random_id}")
+    response = await admin_client.delete(f"/api/v1/books/{random_id}")
 
     assert response.status_code == 404
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_create_book_forbidden_for_regular_user(authenticated_client: AsyncClient, author_service: AuthorService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+
+    book_data = {"title": "Forbidden Book", "author_id": str(author.id), "price": 19.99}
+    response = await authenticated_client.post("/api/v1/books", json=book_data)
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_update_book_forbidden_for_regular_user(authenticated_client: AsyncClient, author_service: AuthorService, book_service: BookService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+    book = await book_service.create(data=BookCreateInput(title="Test Book", author_id=author.id, price=19.99))
+
+    response = await authenticated_client.patch(f"/api/v1/books/{book.id}", json={"title": "Hacked Title"})
+
+    assert response.status_code == 403
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_delete_book_forbidden_for_regular_user(authenticated_client: AsyncClient, author_service: AuthorService, book_service: BookService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+    book = await book_service.create(data=BookCreateInput(title="Test Book", author_id=author.id, price=19.99))
+
+    response = await authenticated_client.delete(f"/api/v1/books/{book.id}")
+
+    assert response.status_code == 403

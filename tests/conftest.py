@@ -93,6 +93,28 @@ async def authenticated_client(client: AsyncClient, test_user: DBUser) -> AsyncC
     return client
 
 
+@pytest_asyncio.fixture
+async def admin_user(db_session: AsyncSession) -> DBUser:
+    user = DBUser(
+        email=f"admin_{uuid.uuid4()}@example.com",
+        full_name="Admin User",
+        hashed_password=hash_password("adminpassword123"),
+        is_active=True,
+        is_admin=True,
+    )
+    await db_session.create(user)
+    return user
+
+
+@pytest_asyncio.fixture
+async def admin_client(client: AsyncClient, admin_user: DBUser) -> AsyncClient:
+    async def mock_authenticate_user() -> DBUser:
+        return admin_user
+
+    app.dependency_overrides[authenticate_user] = mock_authenticate_user
+    return client
+
+
 @pytest.fixture
 def user_signup_data() -> dict:
     return {

@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends
 from src.db.models import DBUser
 from src.routes.v1.books.schema import BookCreateInput, BookOutput, BookUpdateInput
 from src.routes.v1.books.service import BookService, get_book_service
-from src.utils.auth import authenticate_user
+from src.utils.auth import authenticate_user, require_admin
 
 router = APIRouter(prefix="/books", tags=["books"])
 
@@ -13,7 +13,7 @@ router = APIRouter(prefix="/books", tags=["books"])
 async def create_book(
     book_input: BookCreateInput,
     book_service: BookService = Depends(get_book_service),
-    current_user: DBUser = Depends(authenticate_user),
+    current_user: DBUser = Depends(require_admin),
 ):
     book = await book_service.create(data=book_input)
     return BookOutput(**book.model_dump())
@@ -43,7 +43,7 @@ async def update_book(
     book_id: UUID,
     update_input: BookUpdateInput,
     book_service: BookService = Depends(get_book_service),
-    current_user: DBUser = Depends(authenticate_user),
+    current_user: DBUser = Depends(require_admin),
 ):
     book = await book_service.update(book_id=book_id, data=update_input)
     return BookOutput(**book.model_dump())
@@ -53,6 +53,6 @@ async def update_book(
 async def delete_book(
     book_id: UUID,
     book_service: BookService = Depends(get_book_service),
-    current_user: DBUser = Depends(authenticate_user),
+    current_user: DBUser = Depends(require_admin),
 ):
     await book_service.delete(book_id=book_id)
