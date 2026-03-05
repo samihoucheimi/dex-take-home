@@ -2,7 +2,7 @@ from uuid import UUID
 
 from fastapi import APIRouter, Depends
 from src.db.models import DBUser
-from src.routes.v1.books.schema import BookCreateInput, BookOutput, BookUpdateInput
+from src.routes.v1.books.schema import BookCreateInput, BookOutput, BookSearchResult, BookUpdateInput
 from src.routes.v1.books.service import BookService, get_book_service
 from src.utils.auth import authenticate_user, require_admin
 
@@ -26,6 +26,25 @@ async def list_books(
 ):
     books = await book_service.list()
     return [BookOutput(**book.model_dump()) for book in books]
+
+
+# Must be registered before /{book_id} to avoid FastAPI treating "search" as a UUID
+@router.get("/search", response_model=list[BookSearchResult])
+async def search_books(
+    q: str,
+    book_service: BookService = Depends(get_book_service),
+    current_user: DBUser = Depends(authenticate_user),
+):
+    return await book_service.search(query=q)
+
+
+# Must be registered before /{book_id} for the same reason
+@router.post("/backfill-summaries", response_model=dict)
+async def backfill_summaries(
+    book_service: BookService = Depends(get_book_service),
+    current_user: DBUser = Depends(require_admin),
+):
+    return await book_service.backfill_summaries()
 
 
 @router.get("/{book_id}", response_model=BookOutput)

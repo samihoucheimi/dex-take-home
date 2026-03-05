@@ -1,8 +1,12 @@
 """Database models using SQLModel."""
 
+from __future__ import annotations
+
 from datetime import datetime
 from uuid import UUID, uuid4
 
+from pgvector.sqlalchemy import Vector
+from sqlalchemy import Column
 from sqlmodel import Field, SQLModel
 
 
@@ -44,6 +48,9 @@ class DBBook(SQLModel, table=True):
     description: str | None = Field(default=None)
     price: float
     published_date: datetime | None = Field(default=None)
+    full_text: str | None = Field(default=None)
+    summary: str | None = Field(default=None)
+    embedding: list[float] | None = Field(default=None, sa_column=Column(Vector(1536)))
     created_at: datetime = Field(default_factory=datetime.utcnow)
     updated_at: datetime = Field(default_factory=datetime.utcnow, sa_column_kwargs={"onupdate": datetime.utcnow})
 

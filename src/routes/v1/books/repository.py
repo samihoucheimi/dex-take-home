@@ -1,5 +1,8 @@
+from __future__ import annotations
+
 from uuid import UUID
 
+from sqlalchemy import text
 from sqlmodel import select
 from sqlmodel.ext.asyncio.session import AsyncSession
 from src.db.models import DBBook
@@ -33,3 +36,18 @@ class BookRepository:
     async def delete(self, book_id: UUID) -> None:
         book = await self.retrieve(book_id)
         await self.db_session.delete(book)
+
+    async def search_by_embedding(self, embedding: list[float], limit: int = 10) -> list[tuple[DBBook, float]]:
+        stmt = text(
+            "SELECT id, (embedding <=> CAST(:embedding AS vector)) AS distance "
+            "FROM books WHERE embedding IS NOT NULL "
+            "ORDER BY distance ASC LIMIT :limit"
+        )
+        result = await self.db_session.execute(stmt, {"embedding": str(embedding), "limit": limit})
+        rows = result.fetchall()
+
+        books_with_scores = []
+        for row in rows:
+            book = await self.retrieve(book_id=row.id)
+            books_with_scores.append((book, row.distance))
+        return books_with_scores

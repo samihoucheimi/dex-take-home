@@ -6,6 +6,7 @@ from collections.abc import AsyncGenerator
 import pytest
 import pytest_asyncio
 from httpx import ASGITransport, AsyncClient
+from sqlalchemy import text
 from sqlalchemy.ext.asyncio import async_sessionmaker, create_async_engine
 from sqlmodel import SQLModel
 from sqlmodel.ext.asyncio.session import AsyncSession
@@ -30,8 +31,9 @@ async def db_session() -> AsyncGenerator[AsyncSession, None]:
         echo=False,
     )
 
-    # Create tables
+    # Create tables (enable vector extension first — required for the embedding column on DBBook)
     async with async_engine.begin() as conn:
+        await conn.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
         await conn.run_sync(SQLModel.metadata.create_all)
 
     # Create session factory - matching db/operations.py pattern

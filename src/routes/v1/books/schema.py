@@ -10,6 +10,7 @@ class BookCreateInput(BaseModel):
     description: str | None = None
     price: float = Field(gt=0)
     published_date: datetime | None = None
+    full_text: str | None = None
 
 
 class BookUpdateInput(BaseModel):
@@ -18,6 +19,7 @@ class BookUpdateInput(BaseModel):
     description: str | None = None
     price: float | None = Field(default=None, gt=0)
     published_date: datetime | None = None
+    full_text: str | None = None
 
 
 class BookOutput(BaseModel):
@@ -27,3 +29,9 @@ class BookOutput(BaseModel):
     description: str | None
     price: float
     published_date: datetime | None
+    summary: str | None
+
+
+class BookSearchResult(BaseModel):
+    book: BookOutput
+    score: float

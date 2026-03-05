@@ -35,6 +35,9 @@ class Settings(BaseSettings):
     # Session
     SESSION_EXPIRE_MINUTES: int = 30
 
+    # OpenAI
+    OPENAI_API_KEY: str = ""
+
     @computed_field
     @property
     def DATABASE_URL(self) -> str:

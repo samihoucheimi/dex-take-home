@@ -1,10 +1,13 @@
 """Tests for book endpoints."""
 
 import uuid
+from unittest.mock import AsyncMock, patch
 from uuid import UUID
 
 import pytest
 from httpx import AsyncClient
+from sqlmodel.ext.asyncio.session import AsyncSession
+from src.db.models import DBBook
 from src.routes.v1.authors.schema import AuthorCreateInput
 from src.routes.v1.authors.service import AuthorService
 from src.routes.v1.books.schema import BookCreateInput
@@ -366,3 +369,145 @@ async def test_delete_book_forbidden_for_regular_user(authenticated_client: Asyn
     response = await authenticated_client.delete(f"/api/v1/books/{book.id}")
 
     assert response.status_code == 403
+
+
+# --- LLM summary tests ---
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_create_book_with_full_text_generates_summary(admin_client: AsyncClient, author_service: AuthorService, book_service: BookService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+    mock_embedding = [0.1] * 1536
+
+    with patch("src.routes.v1.books.service.generate_summary", new_callable=AsyncMock) as mock_summary, \
+            patch("src.routes.v1.books.service.generate_embedding", new_callable=AsyncMock) as mock_emb:
+        mock_summary.return_value = "A compelling story about software."
+        mock_emb.return_value = mock_embedding
+
+        response = await admin_client.post("/api/v1/books", json={
+            "title": "LLM Book",
+            "author_id": str(author.id),
+            "price": 19.99,
+            "full_text": "This is the full text of the book.",
+        })
+
+    assert response.status_code == 201
+    data = response.json()
+    assert data["summary"] == "A compelling story about software."
+
+    # Verify persisted to DB
+    book = await book_service.retrieve(book_id=UUID(data["id"]))
+    assert book.summary == "A compelling story about software."
+    assert list(book.embedding) == mock_embedding
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_create_book_without_full_text_has_no_summary(admin_client: AsyncClient, author_service: AuthorService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+
+    response = await admin_client.post("/api/v1/books", json={
+        "title": "No Text Book",
+        "author_id": str(author.id),
+        "price": 19.99,
+    })
+
+    assert response.status_code == 201
+    assert response.json()["summary"] is None
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_update_book_with_full_text_regenerates_summary(admin_client: AsyncClient, author_service: AuthorService, book_service: BookService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+    book = await book_service.create(data=BookCreateInput(title="Original", author_id=author.id, price=19.99))
+
+    with patch("src.routes.v1.books.service.generate_summary", new_callable=AsyncMock) as mock_summary, \
+            patch("src.routes.v1.books.service.generate_embedding", new_callable=AsyncMock) as mock_emb:
+        mock_summary.return_value = "Updated summary."
+        mock_emb.return_value = [0.2] * 1536
+
+        response = await admin_client.patch(f"/api/v1/books/{book.id}", json={"full_text": "New full text."})
+
+    assert response.status_code == 200
+    assert response.json()["summary"] == "Updated summary."
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_backfill_summaries_processes_books_without_summary(admin_client: AsyncClient, db_session: AsyncSession, author_service: AuthorService, book_service: BookService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+
+    # Create directly via db_session to set full_text without triggering LLM
+    book = DBBook(title="Backfill Book", author_id=author.id, price=19.99, full_text="Text needing a summary.")
+    await db_session.create(book)
+
+    with patch("src.routes.v1.books.service.generate_summary", new_callable=AsyncMock) as mock_summary, \
+            patch("src.routes.v1.books.service.generate_embedding", new_callable=AsyncMock) as mock_emb:
+        mock_summary.return_value = "Backfilled summary."
+        mock_emb.return_value = [0.3] * 1536
+
+        response = await admin_client.post("/api/v1/books/backfill-summaries")
+
+    assert response.status_code == 200
+    assert response.json() == {"processed": 1, "skipped": 0}
+
+    updated_book = await book_service.retrieve(book_id=book.id)
+    assert updated_book.summary == "Backfilled summary."
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_backfill_summaries_skips_books_with_existing_summary(admin_client: AsyncClient, db_session: AsyncSession, author_service: AuthorService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+
+    # This book already has a summary — backfill should not touch it
+    book = DBBook(title="Already Done", author_id=author.id, price=19.99, full_text="Some text.", summary="Existing summary.")
+    await db_session.create(book)
+
+    with patch("src.routes.v1.books.service.generate_summary", new_callable=AsyncMock) as mock_summary, \
+            patch("src.routes.v1.books.service.generate_embedding", new_callable=AsyncMock) as mock_emb:
+        mock_summary.return_value = "Should not be set."
+        mock_emb.return_value = [0.0] * 1536
+
+        response = await admin_client.post("/api/v1/books/backfill-summaries")
+
+    assert response.status_code == 200
+    assert response.json()["processed"] == 0
+    mock_summary.assert_not_called()
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_search_books_returns_ranked_results(admin_client: AsyncClient, author_service: AuthorService):
+    author = await author_service.create(data=AuthorCreateInput(name="Test Author"))
+
+    # Two orthogonal embeddings — cosine distance between them is 1 (maximally different)
+    embedding_a = [1.0] + [0.0] * 1535
+    embedding_b = [0.0, 1.0] + [0.0] * 1534
+
+    with patch("src.routes.v1.books.service.generate_summary", new_callable=AsyncMock) as mock_summary, \
+            patch("src.routes.v1.books.service.generate_embedding", new_callable=AsyncMock) as mock_emb:
+        mock_summary.return_value = "Summary A"
+        mock_emb.return_value = embedding_a
+        book_a = (await admin_client.post("/api/v1/books", json={"title": "Book A", "author_id": str(author.id), "price": 10.00, "full_text": "Text A"})).json()
+
+        mock_summary.return_value = "Summary B"
+        mock_emb.return_value = embedding_b
+        book_b = (await admin_client.post("/api/v1/books", json={"title": "Book B", "author_id": str(author.id), "price": 10.00, "full_text": "Text B"})).json()
+
+    # Query pointing in direction A — Book A should rank first
+    with patch("src.routes.v1.books.service.generate_embedding", new_callable=AsyncMock) as mock_emb:
+        mock_emb.return_value = [1.0] + [0.0] * 1535
+        response = await admin_client.get("/api/v1/books/search?q=topic+A")
+
+    assert response.status_code == 200
+    results = response.json()
+    assert len(results) == 2
+    assert results[0]["book"]["id"] == book_a["id"]
+    assert results[0]["score"] > results[1]["score"]
+
+
+@pytest.mark.asyncio(loop_scope="function")
+async def test_search_books_empty_when_no_embeddings(admin_client: AsyncClient):
+    with patch("src.routes.v1.books.service.generate_embedding", new_callable=AsyncMock) as mock_emb:
+        mock_emb.return_value = [0.1] * 1536
+        response = await admin_client.get("/api/v1/books/search?q=anything")
+
+    assert response.status_code == 200
+    assert response.json() == []
