@@ -35,9 +35,6 @@ ENV/
 # Environment variables
 .env
 
-# Private documentation
-TECHNICAL_COMMENTARY.md
-
 # Testing
 .pytest_cache/
 .coverage
